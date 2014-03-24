@@ -4,6 +4,7 @@ Created on 05.09.2013
 @author: pinkflawd
 '''
 
+from __future__ import print_function
 import logging.config
 from optparse import OptionParser
 import os
@@ -24,13 +25,13 @@ def main():
     '''
     
     try:
-        logging.config.fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'conf', 'logger.conf'))
+        logging.config.fileConfig(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'logger.conf'))
         log = logging.getLogger('Main')
-    except:
+    except IOError:
         # here could go some configuration of a default logger -- me too lazy
         # additionally one could add a cmdline option for loggint to a file instead of stdout -- me too lazy
-        print "Error, logger.conf not found or broken. Check on http://docs.python.org/2/howto/logging.html what to do."
-        exit(1)
+        print("Error, logger.conf not found or broken. Check on http://docs.python.org/2/howto/logging.html what to do.")
+        sys.exit(1)
     
     parser = OptionParser()
        
@@ -58,11 +59,11 @@ def main():
     parser.add_option("-2", "--lib_2", dest="lib_two", help="Baselib for diffing - Win8 goes here")
     parser.add_option("-e", "--diff_byname", dest="diffbyname", help="Diff two libs by name, two-sided, provide a libname like advapi32.c. CAUTION: Tool aborts when more than 2 libs are matched and DOES NOT VERIFY if the two difflibs belong together.")
     
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     
     ### OPTION backend ###
     
-    if (options.database == "mssql" or options.database == "MSSQL"):
+    if options.database.lower() in "mssql":
         database = "MSSQL"
         import Database.MSSqlDB
         db = Database.MSSqlDB.MSSqlDB()
@@ -73,28 +74,26 @@ def main():
 
     ### OPTION parse ###
  
-    if (options.filename is not None or options.directory is not None) and options.os is not None and options.ftype is not None:
+    if None not in (options.filename, options.directory) and None not in (options.os, options.ftype):
         
         try:
             
-            lib_files = []
-            
             if options.directory is not None:
-                lib_files = [os.path.join(options.directory, f) for f in os.listdir(options.directory) if os.path.isfile(os.path.join(options.directory,f))]
+                _, _, lib_files = os.walk(options.directory).next()
             else:
-                lib_files.append(options.filename)
+                lib_files = list(options.filename)
                 
             for lib_file in lib_files:        
                 lib = Parsing.Library.Library(lib_file, options.os, options.ftype, database)
                 
                 # if lib exists - flush functions
                 # if lib exists and no-flush active - continue
-                if (lib.existant == True and options.noflush is None) or lib.existant == False:
+                if (lib.existant and options.noflush is None) or not lib.existant:
                     lib.flush_me()
-                
-                    if options.ftype == "c" or options.ftype == "C":
+                    option = options.ftype.lower()
+                    if option == "c":
                         lib.parse_cfile()
-                    elif options.ftype == "lst" or options.ftype == "LST":
+                    elif option == "lst":
                         lib.parse_lstfile()
                     else:
                         log.error("Wrong file type! Either c or C or lst or LST, pleeease dont mix caps with small letters, dont have all day for op parsing ;)")
@@ -104,34 +103,34 @@ def main():
                     log.info("Nothing to parse here, continue.")
 
         except:
-            type, value, tb = sys.exc_info()
+            _type, value, tb = sys.exc_info()
             log.error("Something went wrong when parsing a library: %s" % (sys.exc_info()[1]))
-            traceback.print_exception(type, value, tb, limit=10, file=sys.stdout)
+            traceback.print_exception(_type, value, tb, limit=10, file=sys.stdout)
             log.error("If MSSQL, are the access credentials right? Did you set the right permissions on the DB? Did you perform a create_all on mssql or sqlite?")
         
         
     ### OPTION recreate or flush incomplete ###
     
-    elif (options.flush == True or options.createall == True) and options.updatesigs is None:
+    elif (options.flush or options.createall) and options.updatesigs is None:
         log.error("Options flushall and create-scheme need option --update-sigs or -u !!")
         
         
     ### OPTION recreate, flush or updatesigs ### 
         
-    elif options.updatesigs == True:
+    elif options.updatesigs:
         
         try:
             
-            if options.flush == True or options.createall == True:
+            if options.flush or options.createall:
                 db.flush_all()
                 db.create_scheme()
                 
             signatures = []
             
             try:
-                sigfile = open(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'conf', 'signatures.conf'))
+                sigfile = open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'signatures.conf'))
                 
-            except:
+            except IOError:
                 log.error("Something went wrong when reading signature file.")
             else:  
                 for line in sigfile:
@@ -142,13 +141,13 @@ def main():
                 sigfile.close()
             
             try:
-                sigmapping = open(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'conf', 'sig_mapping.conf'))
-            except:
+                sigmapping = open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'sig_mapping.conf'))
+            except IOError:
                 log.error("Something went wrong when accessing the sig_mapping.conf.")
             else:
                 for line in sigmapping:
-                    map = re.sub('\'','', line.rstrip(),0)
-                    arr = re.split('=', map, 1)
+                    _map = re.sub('\'','', line.rstrip(),0)
+                    arr = re.split('=', _map, 1)
                     db.update_mappings(arr[0], arr[1])
                 sigmapping.close()
         
@@ -165,11 +164,10 @@ def main():
     
     elif options.libname is not None:
         # sanitizing
-        sanilibname = re.sub('\'','', options.libname,0)
+        sanilibname = re.sub('\'', '', options.libname, 0)
         info = Diffing.Info.Info(database)
-        cursor = info.search_libs(sanilibname)
-        for item in cursor:
-            print "Library ID %s for %s with type %s and OS %s" % (item[0], item[1], item[3], item[2])
+        for item in info.search_libs(sanilibname):
+            print("Library ID %s for %s with type %s and OS %s" % (item[0], item[1], item[3], item[2]))
     
     ### OPTION lib_allinfo prints all hit information of one library, given the libid
     
@@ -179,18 +177,15 @@ def main():
         except ValueError:
             log.error("Libid has to be numeric!")
         else:
-            info = Diffing.Info.Info(database)
-            cursor = info.library_info(libid)
-            
-            print "Libname;Functionname;Sigpattern;Line_Offset"
-            for item in cursor:
-                print "%s;%s;%s;%s" % (item[0],item[1],item[2],item[3]) 
+            print("Libname;Functionname;Sigpattern;Line_Offset")
+            for item in Diffing.Info.Info(database).library_info(libid)
+                print("%s;%s;%s;%s" % (item[0], item[1], item[2], item[3]))
     
     ### OPTION diff puts out csv content on the commandline or into a pipe, containing hitcounts of a win7 lib compared with a win8 lib ###
     
-    elif options.diff == True:
+    elif options.diff:
         
-        if options.lib_one is not None or options.lib_two is not None:
+        if None not in (options.lib_one, options.lib_two):
             
             try:
                 w7lib = int(options.lib_one)
@@ -198,9 +193,7 @@ def main():
             except ValueError:
                 log.error("Libids have to be numeric!")
             else:
-                info = Diffing.Info.Info(database)
-                output = info.diff_twosided(w7lib, w8lib)
-                print output
+                print(Diffing.Info.Info(database).diff_twosided(w7lib, w8lib))
                 
         else:
             log.error("The Diff Option needs two valid library IDs, get them using the search_libs option, providing a library name!")
@@ -208,13 +201,12 @@ def main():
     ### OPTION diff_byname
     
     elif options.diffbyname is not None:
-        sanilibname = re.sub('\'','', options.diffbyname,0)
-        info = Diffing.Info.Info(database)
-        ids = info.search_libs_diffing(sanilibname)
-        if (ids != -1):
+        sanilibname = re.sub('\'', '', options.diffbyname, 0)
+        ids = Diffing.Info.Info(database).search_libs_diffing(sanilibname)
+        if ids != -1:
             #info.diff_libs(ids[0],ids[1])   # 0.. Win7, 1.. Win8
-            output = info.diff_twosided(ids[0],ids[1])
-            print output
+            output = info.diff_twosided(ids[0], ids[1])
+            print(output)
         else:
             log.error("Something went wrong when choosing libs, maybe more than 2 matches or two libs with the same OS? Or different filetypes? Check with search_libs option!")
     
