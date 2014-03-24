@@ -4,7 +4,7 @@ Created on 13.10.2013
 @author: Marion
 '''
 
-from os import path
+import os.path
 import sys
 
 from PyQt4 import QtGui, QtCore
@@ -20,21 +20,21 @@ class MainWindow(QtGui.QMainWindow):
         
         self.setCentralWidget(self.textEdit)
         
-        exit = QtGui.QAction(QtGui.QIcon(path.join(path.abspath(path.dirname(__file__)), '..', 'icons', 'witch.png')), 'Exit', self)
+        exit = QtGui.QAction(QtGui.QIcon(os.path.join(path.abspath(os.path.dirname(sys.argv[0])), '..', 'icons', 'witch.png')), 'Exit', self)
         exit.setShortcut('Ctrl+Q')
         exit.setStatusTip('Exit application')
         self.connect(exit, QtCore.SIGNAL('triggered()'), QtCore.SLOT('close()'))
         
-        settings = QtGui.QAction(QtGui.QIcon(path.join(path.abspath(path.dirname(__file__)), '..', 'icons', 'cat.png')), 'Settings', self)
+        settings = QtGui.QAction(QtGui.QIcon(os.path.join(path.abspath(os.path.dirname(sys.argv[0])), '..', 'icons', 'cat.png')), 'Settings', self)
         settings.setShortcut('Ctrl+S')
         settings.setStatusTip('Modify Settings')
         
-        signatures = QtGui.QAction(QtGui.QIcon(path.join(path.abspath(path.dirname(__file__)), '..', 'icons', 'ghost.png')), 'Signatures', self)
+        signatures = QtGui.QAction(QtGui.QIcon(os.path.join(path.abspath(path.dirname(sys.argv[0])), '..', 'icons', 'ghost.png')), 'Signatures', self)
         signatures.setShortcut('Ctrl+U')
         signatures.setStatusTip('Update Signatures')
         self.connect(signatures, QtCore.SIGNAL('triggered()'), self.updateSigs)
         
-        mappings = QtGui.QAction(QtGui.QIcon(path.join(path.abspath(path.dirname(__file__)), '..', 'icons', 'pumpkin.png')), 'Mappings', self)
+        mappings = QtGui.QAction(QtGui.QIcon(os.path.join(os.path.abspath(path.dirname(sys.argv[0])), '..', 'icons', 'pumpkin.png')), 'Mappings', self)
         mappings.setShortcut('Ctrl+U')
         mappings.setStatusTip('Update Mappings')
         self.connect(mappings, QtCore.SIGNAL('triggered()'), self.updateMappings)
@@ -45,10 +45,10 @@ class MainWindow(QtGui.QMainWindow):
         self.toolbar.addAction(mappings)
 
         menubar = self.menuBar()
-        file = menubar.addMenu('&Program')
-        file.addAction(settings)
-        file.addAction(signatures)
-        file.addAction(exit)
+        _file = menubar.addMenu('&Program')
+        _file.addAction(settings)
+        _file.addAction(signatures)
+        _file.addAction(exit)
         
     def updateSigs(self):
         self.textEdit = QtGui.QTextEdit()
@@ -57,10 +57,9 @@ class MainWindow(QtGui.QMainWindow):
         
         #self.setCentralWidget(self.textEdit)
         
-        filename = path.join(path.abspath(path.dirname(__file__)), '..', 'conf', 'signatures.conf')
-        file = open(filename)
-        data = file.read()
-        self.textEdit.setText(data)
+        
+        with open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'signatures.conf')) as f:
+            self.textEdit.setText(f.read())
         
         
         grid = QtGui.QGridLayout()
@@ -89,10 +88,8 @@ class MainWindow(QtGui.QMainWindow):
         #self.textEdit = QtGui.QTextEdit()
         self.setCentralWidget(self.textEdit)
         
-        filename = path.join(path.abspath(path.dirname(__file__)), '..', 'conf', 'sig_mapping.conf')
-        file = open(filename)
-        data = file.read()
-        self.textEdit.setText(data)
+        with open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'sig_mapping.conf')) as f:
+            self.textEdit.setText(f.read())
 
 
 class SignatureWindow(QtGui.QWidget):
@@ -105,10 +102,8 @@ class SignatureWindow(QtGui.QWidget):
         self.textEdit = QtGui.QTextEdit()
         #self.setCentralWidget(self.textEdit)
         
-        filename = path.join(path.abspath(path.dirname(__file__)), '..', 'conf', 'signatures.conf')
-        file = open(filename)
-        data = file.read()
-        self.textEdit.setText(data)
+        with open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'signatures.conf')) as f:
+            self.textEdit.setText(f.read())
         
 
 
