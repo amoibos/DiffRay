@@ -14,7 +14,8 @@ import traceback
 
 import Diffing.Info
 import Parsing.Library
-
+from Exceptions import DatabaseError
+from Exceptions import ParameterError
 
 def main():
     
@@ -79,7 +80,7 @@ def main():
         try:
             
             if options.directory is not None:
-                _, _, lib_files = os.walk(options.directory).next()
+                lib_files = os.walk(options.directory).next()[2]
             else:
                 lib_files = list(options.filename)
                 
@@ -90,10 +91,10 @@ def main():
                 # if lib exists and no-flush active - continue
                 if (lib.existant and options.noflush is None) or not lib.existant:
                     lib.flush_me()
-                    option = options.ftype.lower()
-                    if option == "c":
+                    
+                    if options.ftype in ("c", "C"):
                         lib.parse_cfile()
-                    elif option == "lst":
+                    elif options.ftype in ("lst", "LST"):
                         lib.parse_lstfile()
                     else:
                         log.error("Wrong file type! Either c or C or lst or LST, pleeease dont mix caps with small letters, dont have all day for op parsing ;)")
@@ -102,7 +103,7 @@ def main():
                 else:
                     log.info("Nothing to parse here, continue.")
 
-        except:
+        except ParameterError:
             _type, value, tb = sys.exc_info()
             log.error("Something went wrong when parsing a library: %s" % (sys.exc_info()[1]))
             traceback.print_exception(_type, value, tb, limit=10, file=sys.stdout)
@@ -128,45 +129,37 @@ def main():
             signatures = []
             
             try:
-                sigfile = open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'signatures.conf'))
-                
+                with open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'signatures.conf')) as sig_file:
+                    for line in sigfile:
+                        #sanitizing the signatures
+                        sig = re.sub('\'','', line.rstrip(),0)
+                        signatures.append(sig)
+                    db.insert_signatures(signatures)
             except IOError:
                 log.error("Something went wrong when reading signature file.")
-            else:  
-                for line in sigfile:
-                    #sanitizing the signatures
-                    sig = re.sub('\'','', line.rstrip(),0)
-                    signatures.append(sig)
-                db.insert_signatures(signatures)
-                sigfile.close()
-            
+           
             try:
-                sigmapping = open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'sig_mapping.conf'))
+                with open(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '..', 'conf', 'sig_mapping.conf')) as sigmapping:
+                    for line in sigmapping:
+                        _map = re.sub('\'','', line.rstrip(),0)
+                        arr = re.split('=', _map, 1)
+                        db.update_mappings(arr[0], arr[1])
             except IOError:
                 log.error("Something went wrong when accessing the sig_mapping.conf.")
-            else:
-                for line in sigmapping:
-                    _map = re.sub('\'','', line.rstrip(),0)
-                    arr = re.split('=', _map, 1)
-                    db.update_mappings(arr[0], arr[1])
-                sigmapping.close()
-        
-        except:
+        except DatabaseError:
             log.error("Something went wrong when updating the signatures in DB.")
 
     ### OPTION printmappings shows all the mappings that exist for sigs in the DB ###
     
     elif options.printmappings is not None:
-        info = Diffing.Info.Info(database)
-        info.print_mappings()
+        Diffing.Info.Info(database).print_mappings()
         
     ### OPTION search_libs gets you the lib IDs to a given libname ###
     
     elif options.libname is not None:
         # sanitizing
         sanilibname = re.sub('\'', '', options.libname, 0)
-        info = Diffing.Info.Info(database)
-        for item in info.search_libs(sanilibname):
+        for item in Diffing.Info.Info(database).search_libs(sanilibname):
             print("Library ID %s for %s with type %s and OS %s" % (item[0], item[1], item[3], item[2]))
     
     ### OPTION lib_allinfo prints all hit information of one library, given the libid
